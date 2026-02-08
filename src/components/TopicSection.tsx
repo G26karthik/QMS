@@ -1,10 +1,5 @@
 import { useState, ChangeEvent, KeyboardEvent } from 'react';
 import {
-  DndContext,
-  closestCenter,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
@@ -27,7 +22,6 @@ import { Button, Input, ConfirmModal } from './ui';
 import { SubTopicCard } from './SubTopicCard';
 import { EmptyState } from './EmptyState';
 import { useSheetStore } from '../store/useSheetStore';
-import { useDragSensors } from '../hooks/useDragSensors';
 
 interface TopicSectionProps {
   topic: Topic;
@@ -49,7 +43,6 @@ export function TopicSection({ topic, isFiltered = false }: TopicSectionProps) {
     updateTopic,
     deleteTopic,
     addSubTopic,
-    reorderSubTopics,
     topicsById,
   } = useSheetStore();
 
@@ -70,8 +63,6 @@ export function TopicSection({ topic, isFiltered = false }: TopicSectionProps) {
     transform: CSS.Transform.toString(transform),
     transition,
   };
-
-  const sensors = useDragSensors();
 
   const handleSave = () => {
     setEditError(null);
@@ -104,17 +95,6 @@ export function TopicSection({ topic, isFiltered = false }: TopicSectionProps) {
     setIsAddingSubTopic(false);
     setNewSubTopicName('');
     setAddError(null);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = subTopicIds.findIndex((id) => id === active.id);
-      const newIndex = subTopicIds.findIndex((id) => id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        reorderSubTopics(topic.id, oldIndex, newIndex);
-      }
-    }
   };
 
   const totalQuestions = topic.subTopics.reduce(
@@ -219,27 +199,21 @@ export function TopicSection({ topic, isFiltered = false }: TopicSectionProps) {
         {isExpanded && (
           <div className="px-4 py-4 space-y-3 bg-orange-50/10">
             {topic.subTopics.length > 0 ? (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
+              <SortableContext
+                items={subTopicIds}
+                strategy={verticalListSortingStrategy}
               >
-                <SortableContext
-                  items={subTopicIds}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-4">
-                    {topic.subTopics.map((subTopic) => (
-                      <SubTopicCard
-                        key={subTopic.id}
-                        subTopic={subTopic}
-                        topicId={topic.id}
-                        isFiltered={isFiltered}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
+                <div className="space-y-4">
+                  {topic.subTopics.map((subTopic) => (
+                    <SubTopicCard
+                      key={subTopic.id}
+                      subTopic={subTopic}
+                      topicId={topic.id}
+                      isFiltered={isFiltered}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
             ) : (
               !isAddingSubTopic && (
                 <EmptyState

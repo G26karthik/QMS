@@ -1,71 +1,83 @@
-# Interactive Question Management Sheet
+# Question Management Sheet
 
-A React-based web application for managing coding questions organized by topics and sub-topics. This is my solution for the "Interactive Question Management Sheet" take-home assignment.
+Hierarchical question tracker with full CRUD, cross-level drag-and-drop, persistent state, and undo/redo.
 
-## Features Implemented
+**Stack**: React 19 · TypeScript · Vite · Zustand · @dnd-kit · Tailwind CSS
 
-### Core Features
-- **Topics**: Add, edit, and delete topics
-- **Sub-topics**: Add, edit, and delete sub-topics under each topic
-- **Questions**: Add, edit, and delete questions under each sub-topic
-- **Drag-and-Drop**: Reorder topics, sub-topics, and questions by dragging
-- **Expand/Collapse**: Expand or collapse all sections with one click
+## Quick Start
 
-### Bonus Features
-- **Search**: Search questions by title
-- **Difficulty Filter**: Filter questions by difficulty (Easy, Medium, Hard)
+```bash
+npm install && npm run dev
+```
 
-## Tech Stack
+Data loads from [public API](https://node.codolio.com/api/question-tracker/v1/sheet/public/get-sheet-by-slug/striver-sde-sheet), falling back to sample data if unavailable.
 
-- **Framework**: React 19 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **State Management**: Zustand
-- **Drag and Drop**: @dnd-kit
-- **Icons**: Lucide React
+---
 
-## Data Handling
+## Architecture
 
-- Initial data is fetched from the provided public API:
-  `https://node.codolio.com/api/question-tracker/v1/sheet/public/get-sheet-by-slug/striver-sde-sheet`
-- If the API data is not available or unusable, the app automatically uses sample data
-- All add, edit, and delete operations work on the frontend only (changes are not saved to a server)
+### Normalized State (Zustand)
 
-## Assumptions
+```
+topicsById      Record<id, Topic>       ─┐
+subTopicsById   Record<id, SubTopic>     ├─ Entity maps (O(1) lookup)
+questionsById   Record<id, Question>    ─┘
 
-- This is a single-page web application
-- Frontend-only assignment (no backend or database)
-- Designed for desktop browsers with basic tablet support
-- Data does not persist after page refresh
+topicOrder      string[]                ─┐
+topic.subTopicIds    string[]            ├─ Order arrays (O(1) reorder)
+subTopic.questionIds string[]           ─┘
+```
 
-## How to Run
+**Why normalize?** Cross-level drag-and-drop moves items by updating ID arrays—no deep cloning of nested structures. Updates are O(1) and prevent accidental data duplication.
 
-1. Make sure you have Node.js installed (v18 or higher recommended)
+### Persistence
 
-2. Clone or download this project
+Zustand's `persist` middleware syncs state to localStorage on every mutation.
 
-3. Open a terminal in the `question-sheet` folder
+| Aspect | Implementation |
+|--------|----------------|
+| Key | `codolio-sheet` |
+| Versioning | Schema version checked on load; invalid data triggers reset |
+| Excluded | Undo history, hydration flags |
 
-4. Install dependencies:
-   ```bash
-   npm install
-   ```
+### Undo / Redo
 
-5. Start the development server:
-   ```bash
-   npm run dev
-   ```
+Snapshot-based: full state copies stored before each mutation (max 20). Simpler and more reliable than command pattern at the cost of ~20× memory overhead—acceptable for this data size.
 
-6. Open your browser and go to the URL shown in the terminal (usually http://localhost:5173)
+- **Shortcuts**: Ctrl+Z / Ctrl+Shift+Z (Cmd on Mac)
+- **UI**: Header buttons with disabled states
 
-## Project Structure
+### Drag-and-Drop
+
+Single `GlobalDndProvider` wraps the app, enabling:
+- Reorder within container (topics, subtopics, questions)
+- Cross-container moves (question → different subtopic, subtopic → different topic)
+
+Uses `@dnd-kit` with `pointerWithin` + `rectIntersection` collision detection.
+
+---
+
+## Key Tradeoffs
+
+| Decision | Cost | Benefit |
+|----------|------|---------|
+| Full snapshots for undo | Higher memory | No edge cases from partial diffs |
+| localStorage (no backend) | 5MB limit, no multi-tab sync | Zero infra, instant persistence |
+| Normalized state | More boilerplate | O(1) updates, clean cross-level DnD |
+| Global DnD context | Shared state across tree | Cross-container drag without prop drilling |
+
+---
+
+## Project Layout
 
 ```
 src/
-├── components/     # UI components (Header, TopicSection, etc.)
-├── data/           # Sample/mock data
-├── hooks/          # Custom React hooks
-├── store/          # Zustand store for state management
-├── types/          # TypeScript type definitions
-└── utils/          # Helper functions
+├── store/useSheetStore.ts    # Zustand store (state + actions)
+├── components/
+│   ├── GlobalDndProvider.tsx # Unified DnD context
+│   └── ui/                   # Reusable primitives
+├── hooks/
+│   ├── useDragSensors.ts
+│   └── useKeyboardShortcuts.ts
+└── types/                    # TypeScript definitions
 ```

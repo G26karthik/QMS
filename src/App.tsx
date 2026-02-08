@@ -1,21 +1,17 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
-  DndContext,
-  closestCenter,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Plus, FolderOpen, Search } from 'lucide-react';
 import { useSheetStore } from './store/useSheetStore';
-import { useDragSensors } from './hooks/useDragSensors';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ErrorBanner } from './components/ErrorBanner';
 import { EmptyState } from './components/EmptyState';
 import { Header } from './components/Header';
 import { TopicSection } from './components/TopicSection';
+import { GlobalDndProvider } from './components/GlobalDndProvider';
 import { Button, Input } from './components/ui';
 import { Topic } from './types';
 
@@ -24,6 +20,7 @@ function AppContent() {
     topicOrder,
     loading, 
     error,
+    _hasHydrated,
     fetchData, 
     getTopics,
     addTopic, 
@@ -37,8 +34,10 @@ function AppContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState<'All' | 'Easy' | 'Medium' | 'Hard'>('All');
 
-  const sensors = useDragSensors();
   const topics = getTopics();
+  
+  // Register global keyboard shortcuts for undo/redo
+  useKeyboardShortcuts();
 
   // Filter topics based on search and difficulty
   const filteredTopics = useMemo((): Topic[] => {
@@ -67,20 +66,12 @@ function AppContent() {
   const hasActiveFilters = searchQuery !== '' || difficultyFilter !== 'All';
   const noResultsFound = hasActiveFilters && filteredTopics.length === 0 && topics.length > 0;
 
+  // Fetch data only if hydrated and no persisted data exists
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = topicOrder.findIndex((id) => id === active.id);
-      const newIndex = topicOrder.findIndex((id) => id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        reorderTopics(oldIndex, newIndex);
-      }
+    if (_hasHydrated && topicOrder.length === 0) {
+      fetchData();
     }
-  };
+  }, [_hasHydrated, topicOrder.length, fetchData]);
 
   const handleAddTopic = () => {
     setAddError(null);
@@ -99,7 +90,8 @@ function AppContent() {
     setAddError(null);
   };
 
-  if (loading) {
+  // Show loading state while hydrating or fetching data
+  if (!_hasHydrated || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="glass rounded-2xl p-8 flex flex-col items-center gap-4 shadow-xl">
@@ -146,11 +138,7 @@ function AppContent() {
             }
           />
         ) : filteredTopics.length > 0 ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
+          <GlobalDndProvider onTopicReorder={reorderTopics}>
             <SortableContext
               items={topicOrder}
               strategy={verticalListSortingStrategy}
@@ -161,7 +149,7 @@ function AppContent() {
                 ))}
               </div>
             </SortableContext>
-          </DndContext>
+          </GlobalDndProvider>
         ) : topics.length === 0 ? (
           <EmptyState
             icon={<FolderOpen className="h-16 w-16 text-orange-400 float-animation" />}

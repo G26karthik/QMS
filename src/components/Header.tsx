@@ -1,4 +1,4 @@
-import { BookOpen, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp, Search, Undo2, Redo2 } from 'lucide-react';
 import { Button, Select } from './ui';
 import { useSheetStore } from '../store/useSheetStore';
 
@@ -19,7 +19,15 @@ export function Header({
   hasActiveFilters,
   onClearFilters 
 }: HeaderProps) {
-  const { expandAllTopics, collapseAllTopics, getTopics } = useSheetStore();
+  const { 
+    expandAllTopics, 
+    collapseAllTopics, 
+    getTopics,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useSheetStore();
   const topics = getTopics();
 
   const totalSubTopics = topics.reduce((acc, t) => acc + t.subTopics.length, 0);
@@ -54,6 +62,32 @@ export function Header({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
+            {/* Undo/Redo Buttons */}
+            <div className="flex items-center gap-1 mr-2 border-r border-white/20 pr-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={undo}
+                disabled={!canUndo()}
+                className="h-8 w-8 p-0 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
+                title="Undo (Ctrl+Z)"
+                aria-label="Undo"
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={redo}
+                disabled={!canRedo()}
+                className="h-8 w-8 p-0 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-md"
+                title="Redo (Ctrl+Shift+Z)"
+                aria-label="Redo"
+              >
+                <Redo2 className="h-4 w-4" />
+              </Button>
+            </div>
+            
             <Button
               variant="outline"
               size="sm"
